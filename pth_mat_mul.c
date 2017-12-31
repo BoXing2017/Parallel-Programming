@@ -1,0 +1,159 @@
+/*
+   This file is modified from the source code on the text book, but the function has changed to realize the multipulation of matrices.
+   This file has modified by Runqian FANG, Shandong University.
+   E-mail:fangrq@mail.sdu.edu.cn
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <sys/time.h>
+
+/* Global variables */
+int     thread_count;
+int     m, n, p;
+int* A;
+int* B;
+int* C;
+
+/* Serial functions */
+void Usage(char* prog_name);
+void Read_matrixA(char* prompt, int A[], int m, int n);
+void Read_matrixB(char* prompt, int B[], int m, int n);
+void Print_matrix(char* title, int C[], int m, int n);
+
+/* Parallel function */
+void *Pth_mat_mul(void* rank);
+
+/* Timer */
+struct timeval begin,end;
+
+/*------------------------------------------------------------------*/
+int main(int argc, char* argv[]) {
+	long       thread;
+	pthread_t* thread_handles;
+
+	gettimeofday(&begin,NULL);	
+
+	if (argc != 2) Usage(argv[0]);
+	thread_count = atoi(argv[1]);
+	thread_handles = malloc(thread_count*sizeof(pthread_t));
+
+	m=n=p=1000;
+
+	A = malloc(m*n*sizeof(int));
+	B = malloc(n*p*sizeof(int));
+	C = malloc(m*p*sizeof(int));
+
+	Read_matrixA("Enter the matrix", A, m, n);
+
+	Read_matrixB("Enter the matrix", B, n, p);
+
+
+	for (thread = 0; thread < thread_count; thread++)
+		pthread_create(&thread_handles[thread], NULL,
+				Pth_mat_mul, (void*) thread);
+
+	for (thread = 0; thread < thread_count; thread++)
+		pthread_join(thread_handles[thread], NULL);
+
+	Print_matrix("The product is", C, m, p);
+
+	free(A);
+	free(B);
+	free(C);
+
+	gettimeofday(&end,NULL);
+
+	double timeUse = end.tv_sec - begin.tv_sec + (end.tv_usec - begin.tv_usec)/1000000.0;
+	printf("Elapsed time = %e\n", timeUse);
+
+	return 0;
+}  /* main */
+
+
+/*------------------------------------------------------------------
+ * Function:  Usage
+ * Purpose:   print a message showing what the command line should
+ *            be, and terminate
+ * In arg :   prog_name
+ */
+void Usage (char* prog_name) {
+	fprintf(stderr, "usage: %s <thread_count>\n", prog_name);
+	exit(0);
+}  /* Usage */
+
+/*------------------------------------------------------------------
+ * Function:    Read_matrix
+ * Purpose:     Read in the matrix
+ * In args:     prompt, m, n
+ * Out arg:     A
+ */
+void Read_matrixA(char* prompt, int A[], int m, int n) {
+	int             i, j;
+
+	FILE* ain=fopen("a.txt","r");
+	for (i = 0; i < m; i++) 
+		for (j = 0; j < n; j++)
+			fscanf(ain,"%d", &A[i*n+j]);
+	fclose(ain);
+}  /* Read_matrix */
+
+/*------------------------------------------------------------------
+ * Function:    Read_matrix
+ * Purpose:     Read in the matrix
+ * In args:     prompt, m, n
+ * Out arg:     B
+ */
+void Read_matrixB(char* prompt, int B[], int m, int n) {
+	int             i, j;
+
+	FILE* bin=fopen("b.txt","r");
+	for (i = 0; i < m; i++) 
+		for (j = 0; j < n; j++)
+			fscanf(bin,"%d", &B[j*n+i]);
+	fclose(bin);
+}  /* Read_matrix */
+
+/*------------------------------------------------------------------
+ * Function:       Pth_mat_mul
+ * Purpose:        Multiply an mxn matrix by an nxp matrix
+ * In arg:         rank
+ * Global in vars: A, x, m, n, p, thread_count
+ * Global out var: y
+ */
+void *Pth_mat_mul(void* rank) {
+	long my_rank = (long) rank;
+	int i, j, k;
+	int local_m = m/thread_count; 
+	int my_first_row = my_rank*local_m;
+	int my_last_row = (my_rank+1)*local_m - 1;
+
+	for (i = my_first_row; i <= my_last_row; i++) 
+		for (j = 0; j< p; j++){
+			C[i*n+j] = 0;
+			for (k = 0; k < n; k++)
+				C[i*n+j] += A[i*n+k]*B[j*n+k];
+		}
+
+	return NULL;
+}  /* Pth_mat_vect */
+
+
+/*------------------------------------------------------------------
+ * Function:    Print_matrix
+ * Purpose:     Print the matrix
+ * In args:     title, C, m, n
+ */
+void Print_matrix( char* title, int C[], int m, int n) {
+	int   i, j;
+
+	FILE* cout=fopen("c.out","w");
+	for (i = 0; i < m; i++) {
+		for (j = 0; j < n; j++)
+			fprintf(cout, "%d ", C[i*n + j]);
+		fprintf(cout, "\n");
+
+	}
+	fclose(cout);
+}  /* Print_matrix */
